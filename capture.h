@@ -18,6 +18,8 @@ class Capture
 		int m_id;
 		cv::Mat &m_mat;
 		void (*m_transform)(cv::Mat &) = NULL;
+		cv::VideoCapture *m_cap;
+		Clock::time_point m_start, m_stop;
 };
 
 #endif

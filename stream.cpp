@@ -8,6 +8,7 @@ Stream::Stream()
 
 	/* create a server instance */
 	server = gst_rtsp_server_new ();
+	gst_rtsp_server_set_service(server, "554");
 
 	/* get the mount points for this server, every server has a default object
 	 * that be used to map uri mount points to media factories */
