@@ -26,9 +26,15 @@ struct stream_configure {
 class Stream
 {
 	public:
-		static void thread(cv::Mat &mat);
+		Stream();
+		void addEndpoint(std::string path, cv::Mat &mat);
+		void thread();
 		static void need_data(GstElement *appsrc, guint arg1, stream_context *c);
 		static void appsrc_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, stream_configure *conf);
+	private:
+		GMainLoop *loop;
+		GstRTSPServer *server;
+		GstRTSPMountPoints *mounts;
 };
 
 #endif

@@ -1,16 +1,7 @@
 #include "stream.h"
 
-void Stream::thread(cv::Mat &mat)
+Stream::Stream()
 {
-	stream_configure *conf;
-	conf = g_new0 (stream_configure, 1);
-	conf->mat = &mat;
-
-	GMainLoop *loop;
-	GstRTSPServer *server;
-	GstRTSPMountPoints *mounts;
-	GstRTSPMediaFactory *factory;
-
 	gst_init(NULL, NULL);
 
 	loop = g_main_loop_new (NULL, FALSE);
@@ -21,22 +12,27 @@ void Stream::thread(cv::Mat &mat)
 	/* get the mount points for this server, every server has a default object
 	 * that be used to map uri mount points to media factories */
 	mounts = gst_rtsp_server_get_mount_points (server);
+}
 
-	/* make a media factory for a test stream. The default media factory can use
-	 * gst-launch syntax to create pipelines.
-	 * any launch line works as long as it contains elements named pay%d. Each
-	 * element with pay%d names will be a stream */
-	factory = gst_rtsp_media_factory_new ();
+void Stream::addEndpoint(std::string path, cv::Mat &mat)
+{
+	stream_configure *conf;
+	conf = g_new0 (stream_configure, 1);
+	conf->mat = &mat;
+
+	GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
 	gst_rtsp_media_factory_set_launch (factory,
 			"( appsrc name=mysrc ! videoconvert ! video/x-raw,format=I420 ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtph264pay name=pay0 pt=96 )");
 
-	/* notify when our media is ready, This is called whenever someone asks for
-	 * the media and a new pipeline with our appsrc is created */
 	g_signal_connect (factory, "media-configure", (GCallback) Stream::appsrc_configure, conf);
 
-	/* attach the test factory to the /test url */
-	gst_rtsp_mount_points_add_factory (mounts, "/test", factory);
+	gst_rtsp_mount_points_add_factory(mounts, path.c_str(), factory);
 
+	std::cout << "[Stream] Creating new endpoint at: " << path << std::endl;
+}
+
+void Stream::thread()
+{
 	/* don't need the ref to the mounts anymore */
 	g_object_unref (mounts);
 
@@ -44,7 +40,6 @@ void Stream::thread(cv::Mat &mat)
 	gst_rtsp_server_attach (server, NULL);
 
 	/* start serving */
-	g_print ("stream ready at rtsp://127.0.0.1:8554/test\n");
 	g_main_loop_run (loop);
 }
 
