@@ -24,6 +24,15 @@ int main(int argc, char **argv)
 	});
 
 	Capture *cap1 = new Capture(1, cam1);
+	cap1->setTransform([](cv::Mat &mat) {
+		// Horizontal depth lines
+		cv::line(mat, cv::Point(0, 360), cv::Point(STREAM_WIDTH, 360), CV_RGB(255,0,0), 3);
+		cv::line(mat, cv::Point(0, 290), cv::Point(STREAM_WIDTH, 290), CV_RGB(255,0,0), 3);
+
+		// Slanted orientation lines
+		cv::line(mat, cv::Point(200, 290), cv::Point(10, 360), CV_RGB(0,255,0), 3);
+		cv::line(mat, cv::Point(420, 290), cv::Point(610, 360), CV_RGB(0,255,0), 3);
+	});
 
 	//std::thread cam0_thread(&Capture::thread, cap0);
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));

@@ -8,6 +8,7 @@ Capture::Capture(int id, cv::Mat &mat) : m_id(id), m_mat(mat)
 void Capture::thread()
 {
 	Clock::time_point start, stop;
+	cv::Mat capture;
 
 	std::cout << "[" << m_id << "] Opening camera" << std::endl;
 	start = Clock::now();
@@ -18,7 +19,7 @@ void Capture::thread()
 		return;
 
 	std::cout << "[" << m_id << "] Reading first frame..." << std::endl;
-	cap.read(m_mat);
+	cap.read(capture);
 	stop = Clock::now();
 	std::cout << "[" << m_id << "] Reading took " << double(std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count()) / 1000 << " seconds" << std::endl;
 
@@ -26,11 +27,12 @@ void Capture::thread()
 	start = Clock::now();
 	while (1) {
 		count += 1;
-		cap.read(m_mat);
+		cap.read(capture);
 
 		if (m_transform != NULL) {
-			m_transform(m_mat);
+			m_transform(capture);
 		}
+		capture.copyTo(m_mat);
 
 		// Show framerate
 		if (count % 30 == 0) {
