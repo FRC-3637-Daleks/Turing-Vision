@@ -50,35 +50,19 @@ void Stream::thread(cv::Mat &mat)
 
 void Stream::need_data(GstElement *appsrc, guint arg1, stream_context *c)
 {
-	GstMemory *frame;
 	GstMapInfo info;
-	GstBuffer *buffer;
 	GstFlowReturn ret;
 
-	//frame = gst_allocator_alloc(NULL, STREAM_SIZE, NULL);
-	buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE, NULL);
-	frame = gst_buffer_peek_memory(buffer, 0);
-
-	gst_memory_map(frame, &info, GST_MAP_WRITE);
+	gst_buffer_map(c->buffer, &info, GST_MAP_WRITE);
 	memcpy(info.data, c->mat->data, STREAM_SIZE);
-	//memset(info.data, 0xFF, STREAM_SIZE);
-	gst_memory_unmap(frame, &info);
-
-	//memcpy(&(info->data), &(c->mat), STREAM_SIZE);
-
-	//buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE, NULL);
-
-	//gst_buffer_memset(buffer, 0, 0xff, STREAM_SIZE);
-
-	//buffer = gst_buffer_new();
-	//gst_buffer_insert_memory(buffer, 0, frame);
+	gst_buffer_unmap(c->buffer, &info);
 
 	// 30 FPS
-	GST_BUFFER_PTS (buffer) = c->timestamp;
-	GST_BUFFER_DURATION (buffer) = gst_util_uint64_scale_int (1, GST_SECOND, 30);
-	c->timestamp += GST_BUFFER_DURATION (buffer);
+	GST_BUFFER_PTS (c->buffer) = c->timestamp;
+	GST_BUFFER_DURATION (c->buffer) = gst_util_uint64_scale_int (1, GST_SECOND, 30);
+	c->timestamp += GST_BUFFER_DURATION (c->buffer);
 
-	g_signal_emit_by_name (appsrc, "push-buffer", buffer, &ret);
+	g_signal_emit_by_name (appsrc, "push-buffer", c->buffer, &ret);
 }
 
 void Stream::appsrc_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, stream_configure *conf)
@@ -105,6 +89,7 @@ void Stream::appsrc_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media,
 
 	c = g_new0 (stream_context, 1);
 	c->timestamp = 0;
+	c->buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE, NULL);
 	c->mat = conf->mat;
 
 	/* make sure ther data is freed when the media is gone */

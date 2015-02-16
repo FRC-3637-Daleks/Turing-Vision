@@ -14,6 +14,7 @@
 
 struct stream_context {
 	GstClockTime timestamp;
+	GstBuffer *buffer;
 	cv::Mat *mat;
 };
 
