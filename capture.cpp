@@ -22,11 +22,17 @@ Capture::Capture(int id, cv::Mat &mat) : m_id(id), m_mat(mat)
 
 Capture::Capture(int id, std::string addr, cv::Mat &mat) : m_id(id), m_mat(mat)
 {
-	std::cout << "[" << m_id << "] Opening camera" << std::endl;
 	m_start = Clock::now();
-	m_cap = new cv::VideoCapture(addr);
-	if (!m_cap->isOpened())
+	while (1) {
+		std::cout << "[" << m_id << "] Opening camera" << std::endl;
+
+		m_cap = new cv::VideoCapture(addr);
+		if (m_cap->isOpened())
+			break;
+
 		std::cout << "Failed to open camera" << std::endl;
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+	}
 
 	m_cap->set(CV_CAP_PROP_FRAME_WIDTH, STREAM_WIDTH);
 	m_cap->set(CV_CAP_PROP_FRAME_HEIGHT, STREAM_HEIGHT);
