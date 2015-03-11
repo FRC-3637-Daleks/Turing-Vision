@@ -32,6 +32,25 @@ void Stream::addEndpoint(std::string path, cv::Mat &mat)
 	std::cout << "[Stream] Creating new endpoint at: " << path << std::endl;
 }
 
+void Stream::addDualEndpoint(std::string path, cv::Mat &mat, cv::Mat &mat2)
+{
+	stream_configure *conf;
+	conf = g_new0 (stream_configure, 1);
+	conf->mat = &mat;
+	conf->mat2 = &mat2;
+        conf->dual = true;
+
+	GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
+	gst_rtsp_media_factory_set_launch (factory,
+			"( appsrc name=mysrc ! videoconvert ! video/x-raw,format=I420 ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtph264pay name=pay0 pt=96 )");
+
+	g_signal_connect (factory, "media-configure", (GCallback) Stream::appsrc_configure, conf);
+
+	gst_rtsp_mount_points_add_factory(mounts, path.c_str(), factory);
+
+	std::cout << "[Stream] Creating new endpoint at: " << path << std::endl;
+}
+
 void Stream::thread()
 {
 	/* don't need the ref to the mounts anymore */
@@ -61,6 +80,30 @@ void Stream::need_data(GstElement *appsrc, guint arg1, stream_context *c)
 	g_signal_emit_by_name (appsrc, "push-buffer", c->buffer, &ret);
 }
 
+void Stream::need_data_dual(GstElement *appsrc, guint arg1, stream_context *c)
+{
+	GstMapInfo info;
+	GstFlowReturn ret;
+
+	cv::Mat dual(cv::Size(640*2,480), CV_8UC3);
+	cv::Mat left(dual, cv::Rect(0, 0, 640, 480));
+	cv::Mat right(dual, cv::Rect(640, 0, 640, 480));
+
+	c->mat->copyTo(left);
+	c->mat2->copyTo(right);
+
+	gst_buffer_map(c->buffer, &info, GST_MAP_WRITE);
+	memcpy(info.data, dual.data, STREAM_SIZE*2);
+	gst_buffer_unmap(c->buffer, &info);
+
+	// 30 FPS
+	GST_BUFFER_PTS (c->buffer) = c->timestamp;
+	GST_BUFFER_DURATION (c->buffer) = gst_util_uint64_scale_int (1, GST_SECOND, 30);
+	c->timestamp += GST_BUFFER_DURATION (c->buffer);
+
+	g_signal_emit_by_name (appsrc, "push-buffer", c->buffer, &ret);
+}
+
 void Stream::appsrc_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, stream_configure *conf)
 {
 
@@ -76,24 +119,43 @@ void Stream::appsrc_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media,
 	/* this instructs appsrc that we will be dealing with timed buffer */
 	gst_util_set_object_arg (G_OBJECT (appsrc), "format", "time");
 	/* configure the caps of the video */
-	g_object_set (G_OBJECT (appsrc), "caps",
+	if (conf->dual) {
+		g_object_set (G_OBJECT (appsrc), "caps",
+			gst_caps_new_simple ("video/x-raw",
+				"format", G_TYPE_STRING, "BGR",
+				"width", G_TYPE_INT, STREAM_WIDTH*2,
+				"height", G_TYPE_INT, STREAM_HEIGHT,
+				"framerate", GST_TYPE_FRACTION, 0, 1, NULL), NULL);
+	} else {
+		g_object_set (G_OBJECT (appsrc), "caps",
 			gst_caps_new_simple ("video/x-raw",
 				"format", G_TYPE_STRING, "BGR",
 				"width", G_TYPE_INT, STREAM_WIDTH,
 				"height", G_TYPE_INT, STREAM_HEIGHT,
 				"framerate", GST_TYPE_FRACTION, 0, 1, NULL), NULL);
+	}
 
 	c = g_new0 (stream_context, 1);
 	c->timestamp = 0;
-	c->buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE, NULL);
+	if (conf->dual) {
+		c->buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE*2, NULL);
+	} else {
+		c->buffer = gst_buffer_new_allocate(NULL, STREAM_SIZE, NULL);
+	}
 	c->mat = conf->mat;
+	c->mat2 = conf->mat2;
 
 	/* make sure ther data is freed when the media is gone */
 	g_object_set_data_full (G_OBJECT (media), "my-extra-data", c,
 			(GDestroyNotify) g_free);
 
 	/* install the callback that will be called when a buffer is needed */
-	g_signal_connect (appsrc, "need-data", (GCallback) Stream::need_data, c);
+	if (conf->dual) {
+		g_signal_connect (appsrc, "need-data", (GCallback) Stream::need_data_dual, c);
+	} else {
+		g_signal_connect (appsrc, "need-data", (GCallback) Stream::need_data, c);
+	}
+
 	gst_object_unref (appsrc);
 	gst_object_unref (element);
 }

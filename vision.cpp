@@ -32,7 +32,7 @@ void init_cam0(cv::Mat &cam0)
 
 void init_cam1(cv::Mat &cam1)
 {
-	Capture *cap1 = new Capture(1, "rtsp://localhost/cam0", cam1);
+	Capture *cap1 = new Capture(1, "rtsp://localhost:554/cam0", cam1);
 	/*cap1->setTransform([](cv::Mat &mat) {
 		// Horizontal depth lines
 		cv::line(mat, cv::Point(0, 360), cv::Point(STREAM_WIDTH, 360), COLOR_R, 3);
@@ -69,6 +69,7 @@ int main(int argc, char **argv)
 	Stream *str = new Stream();
 	str->addEndpoint("/cam0", cam0);
 	str->addEndpoint("/cam1", cam1);
+	str->addDualEndpoint("/dual", cam0, cam1);
 
 	std::thread stream_thread(&Stream::thread, str);
 
