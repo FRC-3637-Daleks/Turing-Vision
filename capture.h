@@ -12,6 +12,7 @@ class Capture
 {
 	public:
 		Capture(int id, cv::Mat &mat);
+		Capture(int id, std::string addr, cv::Mat &mat);
 		void setTransform(void (*func)(cv::Mat &));
 		void thread();
 	private:
